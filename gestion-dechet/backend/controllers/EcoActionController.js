@@ -21,11 +21,13 @@ exports.getUserEcoActions = async (req, res) => {
             include: [
                 {
                     model: Report,
+                    as: 'report',
                     attributes: ['id', 'type', 'status'],
                     required: false
                 },
                 {
                     model: CleaningEvent,
+                    as: 'cleaningEvent',
                     attributes: ['id', 'title', 'status'],
                     required: false
                 }
@@ -84,15 +86,18 @@ exports.getAllEcoActions = async (req, res) => {
             include: [
                 {
                     model: User,
+                    as: 'user',
                     attributes: ['id', 'firstName', 'lastName', 'email']
                 },
                 {
                     model: Report,
+                    as: 'report',
                     attributes: ['id', 'type', 'status'],
                     required: false
                 },
                 {
                     model: CleaningEvent,
+                    as: 'cleaningEvent',
                     attributes: ['id', 'title', 'status'],
                     required: false
                 }
@@ -130,15 +135,18 @@ exports.getEcoActionById = async (req, res) => {
             include: [
                 {
                     model: User,
+                    as: 'user',
                     attributes: ['id', 'firstName', 'lastName', 'email', 'ecoPoints']
                 },
                 {
                     model: Report,
+                    as: 'report',
                     attributes: ['id', 'type', 'description', 'status', 'severity'],
                     required: false
                 },
                 {
                     model: CleaningEvent,
+                    as: 'cleaningEvent',
                     attributes: ['id', 'title', 'description', 'status', 'date'],
                     required: false
                 }
@@ -235,21 +243,24 @@ exports.getEcoActionsStats = async (req, res) => {
         // Nombre total d'actions
         const totalActions = await EcoAction.count({ where: whereClause });
 
-        // Top utilisateurs
-        const topUsers = await EcoAction.findAll({
-            where: whereClause,
-            attributes: [
-                'userId',
-                [sequelize.fn('COUNT', sequelize.col('id')), 'actionCount'],
-                [sequelize.fn('SUM', sequelize.col('points')), 'totalPoints'],
-            ],
-            group: ['userId'],
-            order: [[sequelize.fn('SUM', sequelize.col('points')), 'DESC']],
-            include: [{
-                model: User,
-                attributes: ['id', 'firstName', 'lastName', 'email']
-            }],
-            limit: 10
+        // Top utilisateurs - APPROCHE AVEC SOUS-REQUÊTE
+        const topUsers = await sequelize.query(`
+            SELECT 
+                u.id,
+                u."firstName",
+                u."lastName",
+                u.email,
+                COUNT(ea.id) as "actionCount",
+                SUM(ea.points) as "totalPoints"
+            FROM "EcoActions" ea
+            INNER JOIN "Users" u ON ea."userId" = u.id
+            ${userId ? `WHERE ea."userId" = '${userId}'` : ''}
+            ${startDate || endDate ? `${userId ? 'AND' : 'WHERE'} ea."createdAt" BETWEEN '${startDate || '1970-01-01'}' AND '${endDate || new Date().toISOString()}'` : ''}
+            GROUP BY u.id, u."firstName", u."lastName", u.email
+            ORDER BY "totalPoints" DESC
+            LIMIT 10
+        `, {
+            type: sequelize.QueryTypes.SELECT
         });
 
         // Evolution mensuelle
@@ -261,7 +272,8 @@ exports.getEcoActionsStats = async (req, res) => {
                 [sequelize.fn('SUM', sequelize.col('points')), 'totalPoints']
             ],
             group: [sequelize.fn('DATE_TRUNC', 'month', sequelize.col('createdAt'))],
-            order: [[sequelize.fn('DATE_TRUNC', 'month', sequelize.col('createdAt')), 'ASC']]
+            order: [[sequelize.fn('DATE_TRUNC', 'month', sequelize.col('createdAt')), 'ASC']],
+            raw: true
         });
 
         res.json({
@@ -288,41 +300,39 @@ exports.getEcoActionsStats = async (req, res) => {
 exports.getUserRanking = async (req, res) => {
     try {
         const { limit = 20, period } = req.query;
-        const whereClause = {};
-
+        
+        let dateCondition = '';
         if (period === 'month') {
             const startOfMonth = new Date();
             startOfMonth.setDate(1);
             startOfMonth.setHours(0, 0, 0, 0);
-            whereClause.createdAt = { [Op.gte]: startOfMonth };
+            dateCondition = `WHERE ea."createdAt" >= '${startOfMonth.toISOString()}'`;
         } else if (period === 'week') {
             const startOfWeek = new Date();
             startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
             startOfWeek.setHours(0, 0, 0, 0);
-            whereClause.createdAt = { [Op.gte]: startOfWeek };
+            dateCondition = `WHERE ea."createdAt" >= '${startOfWeek.toISOString()}'`;
         }
 
-        const userRanking = await EcoAction.findAll({
-            where: whereClause,
-            attributes: [
-                'userId',
-                [sequelize.fn('COUNT', sequelize.col('id')), 'actionCount'],
-                [sequelize.fn('SUM', sequelize.col('points')), 'totalPoints']
-            ],
-            group: ['userId'],
-            order: [[sequelize.fn('SUM', sequelize.col('points')), 'DESC']],
-            limit: parseInt(limit),
-            include: [{
-                model: User,
-                attributes: ['id', 'firstName', 'lastName', 'email', 'level']
-            }]
+        const rankedUsers = await sequelize.query(`
+            SELECT 
+                ROW_NUMBER() OVER (ORDER BY SUM(ea.points) DESC) as rank,
+                u.id as "userId",
+                u."firstName",
+                u."lastName",
+                u.email,
+                u.level,
+                COUNT(ea.id) as "actionCount",
+                SUM(ea.points) as "totalPoints"
+            FROM "EcoActions" ea
+            INNER JOIN "Users" u ON ea."userId" = u.id
+            ${dateCondition}
+            GROUP BY u.id, u."firstName", u."lastName", u.email, u.level
+            ORDER BY "totalPoints" DESC
+            LIMIT ${parseInt(limit)}
+        `, {
+            type: sequelize.QueryTypes.SELECT
         });
-
-        // Ajouter le rang
-        const rankedUsers = userRanking.map((user, index) => ({
-            rank: index + 1,
-            ...user.toJSON()
-        }));
 
         res.json({
             success: true,
