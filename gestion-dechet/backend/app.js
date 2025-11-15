@@ -57,14 +57,6 @@ app.use((req, res) => {
   });
 });
 
-// OU OPTION 2 :
-// app.all('*', (req, res) => {
-//   res.status(404).json({
-//     success: false,
-//     message: `Route non trouvée: ${req.method} ${req.originalUrl}`
-//   });
-// });
-
 // Gestionnaire d'erreurs global amélioré
 app.use((error, req, res, next) => {
   console.error('Erreur:', error);
