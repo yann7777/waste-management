@@ -3,7 +3,7 @@ const { User } = require('../models');
 
 exports.authenticate = async (req, res, next) => {
     try {
-        const token = req.header('Authorization')?.replace('Bearer', '');
+        const token = req.header('Authorization')?.replace('Bearer ', '');
 
         if (!token) {
             return res.status(401).json({
@@ -36,7 +36,7 @@ exports.authenticate = async (req, res, next) => {
 
 exports.authorize = (...roles) => {
     return (req, res, next) => {
-        if (!roles.includes(res.user.role)) {
+        if (!roles.includes(req.user.role)) {
             return res.status(403).json({
                 success: false,
                 message: "Accès non authorisé pour ce rôle"
