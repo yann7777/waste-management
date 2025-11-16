@@ -1,4 +1,4 @@
-const { Notification } = require('../models');
+const { Notification, Report, CleaningEvent, User } = require('../models');
 const { Op } = require('sequelize');
 
 exports.getUserNotifications = async (req, res) => {
@@ -158,6 +158,37 @@ exports.createNotification = async (req, res) => {
             });
         }
 
+        // Vérifier que l'utilisateur existe
+        const user = await User.findByPk(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "Utilisateur non trouvé"
+            });
+        }
+
+        // Vérifier que le rapport existe si relatedReportId est fourni
+        if (relatedReportId) {
+            const report = await Report.findByPk(relatedReportId);
+            if (!report) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Rapport non trouvé"
+                });
+            }
+        }
+
+        // Vérifier que l'événement existe si relatedEventId est fourni
+        if (relatedEventId) {
+            const event = await CleaningEvent.findByPk(relatedEventId);
+            if (!event) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Événement non trouvé"
+                });
+            }
+        }
+
         const notification = await Notification.create({
             userId,
             title,
@@ -178,6 +209,106 @@ exports.createNotification = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Erreur lors de la création de la notification",
+            error: error.message
+        });
+    }
+};
+
+// NOUVELLE FONCTION : Notification globale
+exports.broadcastNotification = async (req, res) => {
+    try {
+        const { title, message, type, actionUrl, metadata } = req.body;
+
+        // Vérifier les permissions (admin seulement)
+        if (req.user.role !== "admin") {
+            return res.status(403).json({
+                success: false,
+                message: "Seuls les administrateurs peuvent envoyer des notifications globales"
+            });
+        }
+
+        // Récupérer tous les utilisateurs
+        const users = await User.findAll({
+            attributes: ['id']
+        });
+
+        // Créer une notification pour chaque utilisateur
+        const notificationPromises = users.map(user => 
+            Notification.create({
+                userId: user.id,
+                title,
+                message,
+                type: type || "info",
+                actionUrl,
+                metadata: metadata || {}
+            })
+        );
+
+        await Promise.all(notificationPromises);
+
+        res.status(201).json({
+            success: true,
+            message: `Notification envoyée à ${users.length} utilisateurs`,
+            data: { usersCount: users.length }
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: "Erreur lors de l'envoi de la notification globale",
+            error: error.message
+        });
+    }
+};
+
+// NOUVELLE FONCTION : Notification par rôle
+exports.sendNotificationToRole = async (req, res) => {
+    try {
+        const { role, title, message, type, actionUrl, metadata } = req.body;
+
+        // Vérifier les permissions (admin seulement)
+        if (req.user.role !== "admin") {
+            return res.status(403).json({
+                success: false,
+                message: "Non autorisé"
+            });
+        }
+
+        // Récupérer les utilisateurs par rôle
+        const users = await User.findAll({
+            where: { role },
+            attributes: ['id']
+        });
+
+        if (users.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: `Aucun utilisateur trouvé avec le rôle ${role}`
+            });
+        }
+
+        // Créer une notification pour chaque utilisateur
+        const notificationPromises = users.map(user => 
+            Notification.create({
+                userId: user.id,
+                title,
+                message,
+                type: type || "info",
+                actionUrl,
+                metadata: metadata || {}
+            })
+        );
+
+        await Promise.all(notificationPromises);
+
+        res.status(201).json({
+            success: true,
+            message: `Notification envoyée à ${users.length} utilisateurs (rôle: ${role})`,
+            data: { usersCount: users.length }
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: "Erreur lors de l'envoi de la notification",
             error: error.message
         });
     }

@@ -12,5 +12,7 @@ router.delete('/:id', authenticate, notificationController.deleteNotification);
 
 // Routes administration (création de notifications)
 router.post('/', authenticate, authorize('admin', 'worker'), notificationController.createNotification);
+router.post('/broadcast', authenticate, authorize('admin'), notificationController.broadcastNotification);
+router.post('/broadcast-to-role', authenticate, authorize('admin'), notificationController.sendNotificationToRole);
 
 module.exports = router;
