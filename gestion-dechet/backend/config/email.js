@@ -1,6 +1,6 @@
-const { text } = require('express');
 const nodemailer = require('nodemailer');
 
+// Configuration du transporteur SMTP
 const createTransporter = () => {
     return nodemailer.createTransport({
         service: process.env.EMAIL_SERVICE,
@@ -11,10 +11,10 @@ const createTransporter = () => {
     });
 };
 
-exports.sendMail = async (to, subject, html, text = null) => {
+exports.sendEmail = async (to, subject, html, text = null) => {
     try {
         const transporter = createTransporter();
-
+        
         const mailOptions = {
             from: `"EcoWaste" <${process.env.EMAIL_USER}>`,
             to,
@@ -24,14 +24,15 @@ exports.sendMail = async (to, subject, html, text = null) => {
         };
 
         const result = await transporter.sendMail(mailOptions);
-        console.log("✅ Email envoyé à:", to);
+        console.log('✅ Email envoyé à:', to);
         return result;
     } catch (error) {
-        console.error("❌ Erreur envoi email à", to, ':', error.message);
+        console.error('❌ Erreur envoi email à', to, ':', error.message);
         throw error;
     }
 };
 
+// Les fonctions sendWelcomeEmail et sendLoginNotificationEmail restent identiques
 exports.sendWelcomeEmail = async (user) => {
     const html = `
         <!DOCTYPE html>
