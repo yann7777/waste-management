@@ -1,18 +1,25 @@
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
+
+// Créer le dossier uploads s'il n'existe pas
+const uploadsDir = 'uploads/';
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+}
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, 'uploads/');
+        cb(null, uploadsDir);
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.filename + '-' + uniqueSuffix + path.extname(file.originalname));
+        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
     }
 });
 
 const fileFilter = (req, file, cb) => {
-    if (file.mimetype.startsWith('images/')) {
+    if (file.mimetype.startsWith('image/')) {
         cb(null, true);
     } else {
         cb(new Error("Seules les images sont autorisées"), false);

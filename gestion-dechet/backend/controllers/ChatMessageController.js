@@ -11,15 +11,23 @@ exports.sendMessage = async (req, res) => {
             recipientId,
             messageType,
             attachments,
-            userId: req.user.id
+            senderId: req.user.id
         });
 
         // Populer les données de l'expéditeur pour la réponse
         const messageWithUser = await ChatMessage.findByPk(message.id, {
-            include: [{
-                model: User,
-                attributes: ['id', 'firstName', 'lastName', 'role']
-            }]
+            include: [
+                {
+                    model: User,
+                    as: 'sender',
+                    attributes: ['id', 'firstName', 'lastName', 'role']
+                },
+                {
+                    model: User,
+                    as: 'recipient',  // Inclure aussi le destinataire
+                    attributes: ['id', 'firstName', 'lastName', 'role']
+                }
+            ]
         });
 
         // Emettre l'événement Socket.io
@@ -57,10 +65,18 @@ exports.getRoomMessages = async (req, res) => {
 
         const { count, rows: messages } = await ChatMessage.findAndCountAll({
             where: whereClause,
-            include: [{
-                model: User,
-                attributes: ['id', 'firstName', 'lastName', 'role']
-            }],
+            include: [
+                {
+                    model: User,
+                    as: 'sender',  // CHANGÉ: 'user' -> 'sender'
+                    attributes: ['id', 'firstName', 'lastName', 'role']
+                },
+                {
+                    model: User,
+                    as: 'recipient',
+                    attributes: ['id', 'firstName', 'lastName', 'role']
+                }
+            ],
             order: [['createdAt', 'DESC']],
             limit: parseInt(limit),
             offset: parseInt(offset)
@@ -83,7 +99,7 @@ exports.getRoomMessages = async (req, res) => {
         res.json({
             success: true,
             data: {
-                messages: messages.reverse(), // Retourner dans l'ordre chronologique
+                messages: messages.reverse(),
                 pagination: {
                     current: parseInt(page),
                     total: Math.ceil(count / limit),
@@ -108,7 +124,7 @@ exports.getUserChats = async (req, res) => {
         const userRooms = await ChatMessage.findAll({
             where: {
                 [Op.or]: [
-                    { userId },
+                    { senderId: userId },
                     { recipientId: userId }
                 ]
             },
@@ -122,10 +138,18 @@ exports.getUserChats = async (req, res) => {
             userRooms.map(async (roomObj) => {
                 const lastMessage = await ChatMessage.findOne({
                     where: { room: roomObj.room },
-                    include: [{
-                        model: User,
-                        attributes: ['id', 'firstName', 'lastName']
-                    }],
+                    include: [
+                        {
+                            model: User,
+                            as: 'sender',
+                            attributes: ['id', 'firstName', 'lastName']
+                        },
+                        {
+                            model: User,
+                            as: 'recipient',
+                            attributes: ['id', 'firstName', 'lastName']
+                        }
+                    ],
                     order: [['createdAt', 'DESC']]
                 });
 
@@ -196,7 +220,10 @@ exports.deleteMessage = async (req, res) => {
         const { id } = req.params;
 
         const message = await ChatMessage.findOne({
-            where: { id, userId: req.user.id }
+            where: { 
+                id, 
+                senderId: req.user.id
+            }
         });
 
         if (!message) {

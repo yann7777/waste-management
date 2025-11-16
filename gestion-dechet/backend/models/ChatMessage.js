@@ -12,15 +12,28 @@ const ChatMessage = sequelize.define('ChatMessage', {
         allowNull: false
     },
     messageType: {
-        type: DataTypes.ENUM('text', 'image', 'file', 'system')
+        type: DataTypes.ENUM('text', 'image', 'file', 'system'),
+        defaultValue: 'text'
     },
     room: {
         type: DataTypes.STRING,
         allowNull: false
     },
+    senderId: {  // CHAMP MANQUANT - Ajoutez ceci
+        type: DataTypes.UUID,
+        allowNull: false,
+        references: {
+            model: 'Users',
+            key: 'id'
+        }
+    },
     recipientId: {
         type: DataTypes.UUID,
-        allowNull: true
+        allowNull: true,
+        references: {
+            model: 'Users',
+            key: 'id'
+        }
     },
     isRead: {
         type: DataTypes.BOOLEAN,
@@ -30,6 +43,18 @@ const ChatMessage = sequelize.define('ChatMessage', {
         type: DataTypes.ARRAY(DataTypes.STRING),
         defaultValue: []
     }
+}, {
+    indexes: [
+        {
+            fields: ['room']
+        },
+        {
+            fields: ['senderId']
+        },
+        {
+            fields: ['recipientId']
+        }
+    ]
 });
 
 module.exports = ChatMessage;
