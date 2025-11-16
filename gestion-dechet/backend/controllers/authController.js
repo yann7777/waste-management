@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { User, EcoAction } = require('../models');
-const { Op, where } = require('sequelize');
+const { Op } = require('sequelize');
+const { sendWelcomeEmail, sendLoginNotificationEmail } = require('../config/email');
 
 const generateToken = (userId) => {
     return jwt.sign({ userId }, process.env.JWT_SECRET, {
@@ -11,6 +12,15 @@ const generateToken = (userId) => {
 exports.register = async (req, res) => {
     try {
         const { email, password, firstName, lastName, address, role } = req.body; 
+        
+        // Validation des champs requis
+        if (!email || !password || !firstName || !lastName || !address) {
+            return res.status(400).json({
+                success: false,
+                message: "Tous les champs obligatoires doivent être remplis"
+            });
+        }
+
         const existingUser = await User.findOne({ where: { email } });
         if (existingUser) {
             return res.status(400).json({
@@ -30,9 +40,18 @@ exports.register = async (req, res) => {
 
         const token = generateToken(user.id);
 
+        // Envoyer l'email de bienvenue (ne pas bloquer l'inscription si échec)
+        try {
+            await sendWelcomeEmail(user);
+            console.log('✅ Email de bienvenue envoyé à:', user.email);
+        } catch (emailError) {
+            console.error('❌ Erreur envoi email bienvenue:', emailError.message);
+            // On continue même si l'email échoue
+        }
+
         res.status(201).json({
             success: true,
-            message: "Utilisateur créé avec succès.",
+            message: "Utilisateur créé avec succès. Un email de bienvenue a été envoyé.",
             data: {
                 user: {
                     id: user.id,
@@ -46,6 +65,7 @@ exports.register = async (req, res) => {
             }
         });
     } catch (error) {
+        console.error('❌ Erreur inscription:', error);
         res.status(500).json({
             success: false,
             message: "Erreur lors de la création de l'utilisateur",
@@ -58,6 +78,14 @@ exports.login = async (req, res) => {
     try {
         const { email, password } = req.body;
 
+        // Validation des champs
+        if (!email || !password) {
+            return res.status(400).json({
+                success: false,
+                message: "Email et mot de passe sont requis"
+            });
+        }
+
         const user = await User.findOne({ where: { email } });
         if (!user || !(await user.comparePassword(password))) {
             return res.status(401).json({
@@ -68,9 +96,21 @@ exports.login = async (req, res) => {
 
         const token = generateToken(user.id);
 
+        // Envoyer l'email de notification de connexion
+        try {
+            await sendLoginNotificationEmail(user, {
+                timestamp: new Date(),
+                userAgent: req.get('User-Agent')
+            });
+            console.log('✅ Email de connexion envoyé à:', user.email);
+        } catch (emailError) {
+            console.error('❌ Erreur envoi email connexion:', emailError.message);
+            // On continue même si l'email échoue
+        }
+
         res.json({
             success: true,
-            message: "Connexion réussie",
+            message: "Connexion réussie. Une notification a été envoyée par email.",
             data: {
                 user: {
                     id: user.id,
@@ -85,6 +125,7 @@ exports.login = async (req, res) => {
             }
         });
     } catch (error) {
+        console.error('❌ Erreur connexion:', error);
         res.status(500).json({
             success: false,
             message: "Erreur lors de la connexion",
@@ -113,6 +154,7 @@ exports.getProfile = async (req, res) => {
             }
         });
     } catch (error) {
+        console.error('❌ Erreur récupération profil:', error);
         res.status(500).json({
             success: false,
             message: "Erreur lors de la récupération du profil",
