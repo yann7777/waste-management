@@ -3,92 +3,121 @@ import api from "./api";
 export const reportService = {
     // Créer un signalement - VERSION CORRIGÉE
     createReport: async (reportData, photos = []) => {
-        try {
-            console.log('=== DEBUT createReport ===');
-            console.log('📦 reportData:', reportData);
-            console.log('🖼️ Nombre de photos:', photos.length);
+  try {
+    console.log('=== DEBUT createReport ===');
+    console.log('📦 reportData:', JSON.stringify(reportData, null, 2));
+    console.log('🖼️ Photos reçues:', photos);
 
-            const formData = new FormData();
+    const formData = new FormData();
 
-            // Ajouter les données du signalement
-            Object.keys(reportData).forEach(key => {
-                if (key === 'location' || key === 'wasteCategories') {
-                    // Stringify les objets
-                    const stringValue = JSON.stringify(reportData[key]);
-                    formData.append(key, stringValue);
-                    console.log(`🔧 ${key}:`, stringValue);
-                } else if (reportData[key] !== null && reportData[key] !== undefined) {
-                    formData.append(key, reportData[key].toString());
-                    console.log(`🔧 ${key}:`, reportData[key]);
-                }
+    // Ajouter les données du signalement
+    Object.keys(reportData).forEach(key => {
+      if (key === 'location' || key === 'wasteCategories') {
+        const stringValue = JSON.stringify(reportData[key]);
+        formData.append(key, stringValue);
+        console.log(`🔧 ${key}:`, stringValue);
+      } else if (reportData[key] !== null && reportData[key] !== undefined) {
+        formData.append(key, reportData[key].toString());
+        console.log(`🔧 ${key}:`, reportData[key]);
+      }
+    });
+
+    // CORRECTION COMPLÈTE : Gestion des photos pour le web
+    photos.forEach((photo, index) => {
+      console.log(`📸 Traitement photo ${index}:`, {
+        uri: photo.uri,
+        type: photo.type,
+        name: photo.fileName
+      });
+
+      // CORRECTION : Gestion spécifique pour les blobs (web)
+      if (photo.uri && photo.uri.startsWith('blob:')) {
+        console.warn(`⚠️ Photo ${index} est un blob - tentative de conversion`);
+        
+        // Pour le web, nous devons récupérer le blob et le convertir
+        if (Platform.OS === 'web') {
+          // Solution pour le web : créer un fichier à partir du blob
+          fetch(photo.uri)
+            .then(res => res.blob())
+            .then(blob => {
+              const file = new File([blob], `photo_${Date.now()}_${index}.jpg`, { 
+                type: photo.type || 'image/jpeg' 
+              });
+              formData.append('photos', file);
+              console.log(`✅ Photo ${index} convertie depuis blob`);
+            })
+            .catch(error => {
+              console.error(`❌ Erreur conversion blob photo ${index}:`, error);
             });
-
-            // CORRECTION : Format des photos pour React Native
-            photos.forEach((photo, index) => {
-                let filename = photo.uri.split('/').pop();
-                
-                // S'assurer que le nom a une extension
-                if (!filename || !filename.match(/\.(jpg|jpeg|png)$/)) {
-                    filename = `photo_${Date.now()}_${index}.jpg`;
-                }
-                
-                // Déterminer le type MIME
-                let type = 'image/jpeg';
-                if (photo.uri && photo.uri.match(/\.png$/)) {
-                    type = 'image/png';
-                }
-
-                // FORMAT CORRECT POUR REACT NATIVE
-                formData.append('photos', {
-                    uri: photo.uri,
-                    type: type,
-                    name: filename
-                });
-                
-                console.log(`📸 Photo ${index} ajoutée:`, {
-                    uri: photo.uri,
-                    type: type,
-                    name: filename
-                });
-            });
-
-            console.log('🚀 Envoi vers /api/reports...');
-
-            const response = await api.post("/reports", formData, {
-                headers: {
-                    "Content-Type": "multipart/form-data",
-                },
-                timeout: 60000,
-            });
-            
-            console.log('✅ Réponse reçue:', response.data);
-            return response.data;
-            
-        } catch (error) {
-            console.error('❌ Erreur complète createReport:', {
-                message: error.message,
-                code: error.code,
-                response: error.response?.data,
-                status: error.response?.status,
-                headers: error.response?.headers
-            });
-            
-            // Gestion améliorée des erreurs
-            if (error.response?.data) {
-                throw error.response.data;
-            } else if (error.request) {
-                throw { 
-                    success: false,
-                    message: "Impossible de contacter le serveur. Vérifiez votre connexion internet et que le serveur est démarré." 
-                };
-            } else {
-                throw { 
-                    success: false,
-                    message: error.message || "Erreur lors de la création du signalement" 
-                };
-            }
+        } else {
+          // Sur mobile, ignorer les blobs (ne devrait pas arriver)
+          console.warn(`Photo ${index} blob ignorée sur mobile`);
         }
-    },
+      } else {
+        // CORRECTION : Format standard pour les URI normales
+        let filename = photo.fileName || photo.uri.split('/').pop();
+        
+        if (!filename || !filename.match(/\.(jpg|jpeg|png|heic|heif)$/i)) {
+          filename = `photo_${Date.now()}_${index}.jpg`;
+        }
+        
+        let type = photo.type || 'image/jpeg';
+        if (photo.uri) {
+          const ext = photo.uri.toLowerCase().split('.').pop();
+          if (ext === 'png') type = 'image/png';
+          else if (ext === 'heic' || ext === 'heif') type = 'image/heic';
+        }
+
+        console.log(`✅ Ajout photo ${index}:`, {
+          filename,
+          type,
+          uri: photo.uri ? photo.uri.substring(0, 100) + '...' : 'no uri'
+        });
+
+        // Format correct pour React Native
+        formData.append('photos', {
+          uri: photo.uri,
+          type: type,
+          name: filename
+        });
+      }
+    });
+
+    console.log('🚀 Envoi vers /api/reports...');
+
+    const response = await api.post("/reports", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      timeout: 60000,
+    });
+    
+    console.log('✅ Réponse reçue:', response.data);
+    return response.data;
+    
+  } catch (error) {
+    console.error('❌ Erreur complète createReport:', {
+      message: error.message,
+      code: error.code,
+      response: error.response?.data,
+      status: error.response?.status
+    });
+    
+    if (error.response?.data) {
+      throw error.response.data;
+    } else if (error.request) {
+      throw { 
+        success: false,
+        message: "Impossible de contacter le serveur. Vérifiez votre connexion internet et que le serveur est démarré." 
+      };
+    } else {
+      throw { 
+        success: false,
+        message: error.message || "Erreur lors de la création du signalement" 
+      };
+    }
+  }
+},
 
     // Récupérer tous les signalements (pour admin/worker)
     getReports: async (filters = {}) => {

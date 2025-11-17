@@ -102,9 +102,8 @@ const CreateReport = ({ navigation }) => {
 
   const reportTypes = [
     { label: 'Dépôt sauvage', value: 'illegal_dumping' },
-    { label: 'Encombrants', value: 'bulky_waste' },
-    { label: 'Déchets dangereux', value: 'hazardous_waste' },
-    { label: 'Déchets électroniques', value: 'electronic_waste' },
+    { label: 'Poubelle pleine', value: 'full_bin' },
+    { label: 'Poubelle cassée', value: 'broken_bin' },
     { label: 'Autre', value: 'other' }
   ];
 
@@ -146,7 +145,6 @@ const CreateReport = ({ navigation }) => {
   const getCurrentLocation = async () => {
     try {
       if (Platform.OS === 'web') {
-        // Sur le web, utiliser une position par défaut
         console.log('Web: utilisation de la position par défaut (Paris)');
         return;
       }
@@ -200,7 +198,15 @@ const CreateReport = ({ navigation }) => {
         return;
       }
 
-      // CORRECTION : Utilisation correcte de MediaTypeOptions
+      if (Platform.OS === 'web') {
+        Alert.alert(
+          'Fonctionnalité limitée',
+          'La prise de photo directe est limitée sur le web. Vous pouvez créer le signalement sans photos ou utiliser l\'application mobile pour une expérience complète.',
+          [{ text: 'Compris' }]
+        );
+        return;
+      }
+
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -220,9 +226,12 @@ const CreateReport = ({ navigation }) => {
 
   const pickImage = async () => {
     try {
-      // Vérification pour le web
       if (Platform.OS === 'web') {
-        Alert.alert('Info', 'La sélection d\'images depuis la galerie n\'est pas disponible sur le web. Utilisez la fonctionnalité de prise de photo.');
+        Alert.alert(
+          'Fonctionnalité désactivée',
+          'L\'ajout de photos depuis la galerie est temporairement désactivé sur la version web. Vous pouvez créer le signalement sans photos ou utiliser l\'application mobile.',
+          [{ text: 'Compris' }]
+        );
         return;
       }
 
@@ -232,7 +241,6 @@ const CreateReport = ({ navigation }) => {
         return;
       }
 
-      // CORRECTION : Utilisation correcte de MediaTypeOptions
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsMultipleSelection: true,
@@ -257,92 +265,146 @@ const CreateReport = ({ navigation }) => {
   };
 
   const validateForm = () => {
+    console.log('🔍 Validation du formulaire...');
+    
     if (!formData.type) {
-      Alert.alert('Erreur', 'Veuillez sélectionner un type de signalement');
+      console.log('❌ Type manquant');
+      if (Platform.OS === 'web') {
+        alert('Erreur: Veuillez sélectionner un type de signalement');
+      } else {
+        Alert.alert('Erreur', 'Veuillez sélectionner un type de signalement');
+      }
       return false;
     }
+    console.log('✅ Type OK:', formData.type);
 
     if (!formData.location.latitude || !formData.location.longitude) {
-      Alert.alert('Erreur', 'Veuillez sélectionner un emplacement');
+      console.log('❌ Location manquante:', formData.location);
+      if (Platform.OS === 'web') {
+        alert('Erreur: Veuillez sélectionner un emplacement');
+      } else {
+        Alert.alert('Erreur', 'Veuillez sélectionner un emplacement');
+      }
       return false;
     }
+    console.log('✅ Location OK:', formData.location);
 
-    if (photos.length === 0) {
-      Alert.alert('Attention', 'Aucune photo n\'a été ajoutée. Voulez-vous continuer ?', [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Continuer', onPress: () => submitReport() }
-      ]);
-      return false;
-    }
-
+    console.log('✅ Validation complète réussie');
     return true;
   };
 
   const submitReport = async () => {
-    if (!validateForm()) return;
-
+    console.log('🚀 === DÉBUT submitReport ===');
+    console.log('📊 État complet du formulaire:', formData);
+    
     setLoading(true);
     console.log('=== DÉBUT CRÉATION SIGNALEMENT ===');
 
     try {
-      // Préparer les données pour l'API
       const reportData = {
         type: formData.type,
         description: formData.description || '',
         severity: formData.severity,
         wasteCategories: formData.wasteCategories,
-        estimatedWasteVolume: formData.estimatedWasteVolume ? parseFloat(formData.estimatedWasteVolume) : null,
-        location: formData.location,
+        estimatedWasteVolume: formData.estimatedWasteVolume || null,
+        location: {
+          lat: formData.location.latitude,
+          lng: formData.location.longitude,
+          address: formData.location.address || ''
+        },
         isOffline: false
       };
 
-      console.log('📦 Données du signalement:', reportData);
+      console.log('📦 Données du signalement préparées:', JSON.stringify(reportData, null, 2));
       console.log('🖼️ Nombre de photos:', photos.length);
+      console.log('📍 Location format:', reportData.location);
 
-      // Appel réel à l'API
-      const response = await reportService.createReport(reportData, photos);
+      console.log('🔍 Vérification pré-envoi:');
+      console.log('  - Type:', reportData.type);
+      console.log('  - Severity:', reportData.severity);
+      console.log('  - Location.lat:', reportData.location.lat);
+      console.log('  - Location.lng:', reportData.location.lng);
+      console.log('  - wasteCategories:', reportData.wasteCategories);
+
+      let photosToSend = [];
+      if (Platform.OS !== 'web') {
+        photosToSend = photos.filter(photo => photo.uri && !photo.uri.startsWith('blob:'));
+        console.log('📱 Mode mobile: photos envoyées:', photosToSend.length);
+      } else {
+        console.log('🌐 Mode web: photos désactivées');
+      }
+
+      console.log('📸 Photos à envoyer:', photosToSend.length);
+      console.log('🚀 Envoi vers API...');
+
+      const response = await reportService.createReport(reportData, photosToSend);
       
       console.log('✅ Réponse du serveur:', response);
       
       if (response.success) {
-        Alert.alert(
-          'Succès!', 
-          `Signalement créé avec succès! 🎉\n\nVous avez gagné ${response.data.pointsEarned} points écologiques.`,
-          [
-            { 
-              text: 'Voir mes signalements', 
-              onPress: () => {
-                console.log('Navigation vers UserReports');
-                navigation.navigate('UserReports');
+        const successMessage = `Signalement créé avec succès! 🎉\n\nVous avez gagné ${response.data.pointsEarned} points écologiques.`;
+        
+        if (Platform.OS === 'web') {
+          alert(successMessage);
+          navigation.navigate('CitizenDashboard');
+        } else {
+          Alert.alert(
+            'Succès!', 
+            successMessage,
+            [
+              { 
+                text: 'Voir mes signalements', 
+                onPress: () => navigation.navigate('UserReports')
+              },
+              { 
+                text: 'Retour au tableau de bord',
+                onPress: () => navigation.navigate('CitizenDashboard')
               }
-            },
-            { 
-              text: 'Retour au tableau de bord',
-              onPress: () => {
-                console.log('Retour au tableau de bord');
-                navigation.navigate('CitizenDashboard');
-              }
-            }
-          ]
-        );
+            ]
+          );
+        }
+        
+        // Réinitialiser le formulaire
+        setFormData({
+          type: 'illegal_dumping',
+          description: '',
+          severity: 'medium',
+          wasteCategories: [],
+          estimatedWasteVolume: '',
+          location: {
+            latitude: 48.8566,
+            longitude: 2.3522,
+            address: ''
+          }
+        });
+        setPhotos([]);
       } else {
-        Alert.alert('Erreur', response.message || 'Erreur lors de la création du signalement');
+        console.log('❌ Erreur serveur:', response.message);
+        if (Platform.OS === 'web') {
+          alert('Erreur: ' + (response.message || 'Erreur lors de la création du signalement'));
+        } else {
+          Alert.alert('Erreur', response.message || 'Erreur lors de la création du signalement');
+        }
       }
     } catch (error) {
       console.error('❌ Erreur détaillée:', error);
       
-      // Messages d'erreur plus spécifiques
       let errorMessage = 'Une erreur est survenue lors de la création du signalement';
       
       if (error.message) {
         errorMessage = error.message;
-      } 
+      }
       
       if (error.response) {
         console.error('Réponse erreur:', error.response);
         if (error.response.data && error.response.data.message) {
           errorMessage = error.response.data.message;
         }
+      }
+      
+      if (error.errors) {
+        const validationErrors = error.errors.map(err => `${err.field}: ${err.message}`).join('\n');
+        errorMessage = `Erreurs de validation:\n${validationErrors}`;
       }
       
       if (error.code === 'NETWORK_ERROR' || error.message?.includes('Network Error')) {
@@ -353,7 +415,11 @@ const CreateReport = ({ navigation }) => {
         errorMessage = 'La requête a pris trop de temps. Vérifiez votre connexion internet.';
       }
       
-      Alert.alert('Erreur', errorMessage);
+      if (Platform.OS === 'web') {
+        alert('Erreur: ' + errorMessage);
+      } else {
+        Alert.alert('Erreur', errorMessage);
+      }
     } finally {
       setLoading(false);
       console.log('=== FIN CRÉATION SIGNALEMENT ===');
@@ -361,30 +427,70 @@ const CreateReport = ({ navigation }) => {
   };
 
   const handleSubmit = () => {
-    console.log('Bouton de soumission cliqué');
-    console.log('État du formulaire:', {
+    console.log('🔵 Bouton de soumission cliqué');
+    console.log('📋 État du formulaire:', {
       type: formData.type,
       photos: photos.length,
-      location: formData.location
+      location: formData.location,
+      platform: Platform.OS
     });
 
-    Alert.alert(
-      'Confirmer le signalement',
-      `Êtes-vous sûr de vouloir créer ce signalement?\n\n• Type: ${reportTypes.find(t => t.value === formData.type)?.label}\n• Photos: ${photos.length}\n• Localisation: ${formData.location.latitude.toFixed(4)}, ${formData.location.longitude.toFixed(4)}`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Confirmer', onPress: submitReport }
-      ]
-    );
+    // Valider d'abord le formulaire
+    if (!validateForm()) {
+      console.log('❌ Validation échouée');
+      return;
+    }
+
+    console.log('✅ Validation réussie');
+
+    const selectedType = reportTypes.find(t => t.value === formData.type)?.label;
+    const selectedSeverity = severityLevels.find(s => s.value === formData.severity)?.label;
+    
+    let confirmationMessage = `Êtes-vous sûr de vouloir créer ce signalement?\n\n• Type: ${selectedType}\n• Sévérité: ${selectedSeverity}\n• Localisation: ${formData.location.latitude.toFixed(4)}, ${formData.location.longitude.toFixed(4)}`;
+    
+    if (Platform.OS === 'web' && photos.length > 0) {
+      confirmationMessage += `\n\n⚠️ Note: ${photos.length} photo(s) seront ignorées (limitation technique web)`;
+    } else if (Platform.OS !== 'web') {
+      confirmationMessage += `\n• Photos: ${photos.length}`;
+    } else {
+      confirmationMessage += `\n• Photos: Aucune (version web)`;
+    }
+
+    // Sur le web, utiliser window.confirm
+    if (Platform.OS === 'web') {
+      console.log('🌐 Utilisation de window.confirm pour le web');
+      if (window.confirm(confirmationMessage)) {
+        console.log('✅ Confirmation acceptée - Appel submitReport');
+        submitReport();
+      } else {
+        console.log('❌ Confirmation annulée');
+      }
+    } else {
+      // Sur mobile, utiliser Alert.alert
+      Alert.alert(
+        'Confirmer le signalement',
+        confirmationMessage,
+        [
+          { 
+            text: 'Annuler', 
+            style: 'cancel',
+            onPress: () => console.log('❌ Confirmation annulée')
+          },
+          { 
+            text: 'Confirmer', 
+            onPress: () => {
+              console.log('✅ Confirmation acceptée - Appel submitReport');
+              submitReport();
+            }
+          }
+        ]
+      );
+    }
   };
 
   const openLocationModal = () => {
     if (Platform.OS === 'web') {
-      Alert.alert(
-        'Localisation',
-        `Position actuelle: ${formData.location.latitude.toFixed(4)}, ${formData.location.longitude.toFixed(4)}\n\nLa sélection sur carte n'est disponible que sur l'application mobile.`,
-        [{ text: 'OK' }]
-      );
+      alert(`Position actuelle: ${formData.location.latitude.toFixed(4)}, ${formData.location.longitude.toFixed(4)}\n\nLa sélection sur carte n'est disponible que sur l'application mobile.`);
     } else {
       setShowMap(true);
     }
@@ -396,6 +502,14 @@ const CreateReport = ({ navigation }) => {
         <View style={styles.header}>
           <Text style={styles.title}>Nouveau Signalement</Text>
           <Text style={styles.subtitle}>Signalez un dépôt sauvage dans votre quartier</Text>
+          
+          {Platform.OS === 'web' && (
+            <View style={styles.webWarning}>
+              <Text style={styles.webWarningText}>
+                ⚠️ Version Web: Les photos sont temporairement désactivées
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Type de signalement */}
@@ -504,32 +618,70 @@ const CreateReport = ({ navigation }) => {
 
         {/* Photos */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Photos ({photos.length}/5) *</Text>
+          <Text style={styles.sectionTitle}>
+            Photos ({photos.length}/5)
+            {Platform.OS === 'web' && ' 🚫'}
+          </Text>
+          
           <View style={styles.photoButtons}>
-            <TouchableOpacity style={styles.photoButton} onPress={takePhoto}>
-              <Text style={styles.photoButtonText}>📸 Prendre une photo</Text>
+            <TouchableOpacity 
+              style={[
+                styles.photoButton, 
+                Platform.OS === 'web' && styles.photoButtonDisabled
+              ]} 
+              onPress={takePhoto}
+              disabled={Platform.OS === 'web'}
+            >
+              <Text style={[
+                styles.photoButtonText,
+                Platform.OS === 'web' && styles.photoButtonTextDisabled
+              ]}>
+                {Platform.OS === 'web' ? '🚫 Prendre une photo' : '📸 Prendre une photo'}
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.photoButton} onPress={pickImage}>
-              <Text style={styles.photoButtonText}>🖼️ Choisir depuis la galerie</Text>
+            
+            <TouchableOpacity 
+              style={[
+                styles.photoButton, 
+                Platform.OS === 'web' && styles.photoButtonDisabled
+              ]} 
+              onPress={pickImage}
+              disabled={Platform.OS === 'web'}
+            >
+              <Text style={[
+                styles.photoButtonText,
+                Platform.OS === 'web' && styles.photoButtonTextDisabled
+              ]}>
+                {Platform.OS === 'web' ? '🚫 Choisir depuis la galerie' : '🖼️ Choisir depuis la galerie'}
+              </Text>
             </TouchableOpacity>
           </View>
 
-          <ScrollView horizontal style={styles.photosContainer}>
-            {photos.map((photo, index) => (
-              <View key={index} style={styles.photoItem}>
-                <Image source={{ uri: photo.uri }} style={styles.photo} />
-                <TouchableOpacity 
-                  style={styles.removePhotoButton}
-                  onPress={() => removePhoto(index)}
-                >
-                  <Text style={styles.removePhotoText}>✕</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-          </ScrollView>
-          {photos.length === 0 && (
-            <Text style={styles.photoWarning}>Au moins une photo est recommandée</Text>
+          {Platform.OS !== 'web' && photos.length > 0 && (
+            <ScrollView horizontal style={styles.photosContainer}>
+              {photos.map((photo, index) => (
+                <View key={index} style={styles.photoItem}>
+                  <Image source={{ uri: photo.uri }} style={styles.photo} />
+                  <TouchableOpacity 
+                    style={styles.removePhotoButton}
+                    onPress={() => removePhoto(index)}
+                  >
+                    <Text style={styles.removePhotoText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
           )}
+          
+          {Platform.OS === 'web' ? (
+            <Text style={styles.photoWarningWeb}>
+              📷 Les photos sont temporairement désactivées sur la version web
+            </Text>
+          ) : photos.length === 0 ? (
+            <Text style={styles.photoWarning}>
+              Les photos sont recommandées pour faciliter le traitement
+            </Text>
+          ) : null}
         </View>
 
         {/* Bouton de soumission */}
@@ -572,6 +724,20 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: '#7f8c8d',
+    marginBottom: 12,
+  },
+  webWarning: {
+    backgroundColor: '#fff3cd',
+    borderColor: '#ffeaa7',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  webWarningText: {
+    color: '#856404',
+    textAlign: 'center',
+    fontWeight: '500',
   },
   section: {
     backgroundColor: '#fff',
@@ -760,9 +926,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#f9f9f9',
   },
+  photoButtonDisabled: {
+    backgroundColor: '#e9ecef',
+    borderColor: '#dee2e6',
+  },
   photoButtonText: {
     fontSize: 14,
     color: '#2c3e50',
+  },
+  photoButtonTextDisabled: {
+    color: '#6c757d',
+    textDecorationLine: 'line-through',
   },
   photosContainer: {
     flexDirection: 'row',
@@ -797,6 +971,17 @@ const styles = StyleSheet.create({
     color: '#e74c3c',
     marginTop: 8,
     fontStyle: 'italic',
+    textAlign: 'center',
+  },
+  photoWarningWeb: {
+    fontSize: 12,
+    color: '#6c757d',
+    marginTop: 8,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    backgroundColor: '#f8f9fa',
+    padding: 8,
+    borderRadius: 6,
   },
   submitButton: {
     backgroundColor: '#27ae60',
