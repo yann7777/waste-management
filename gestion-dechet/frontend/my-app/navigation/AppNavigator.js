@@ -34,6 +34,7 @@ import WorkerStats from '../screens/dashboard/worker/WorkerStats';
 import WorkerNotifications from '../screens/dashboard/worker/WorkerNotifications';
 import WorkerChat from '../screens/dashboard/worker/WorkerChat';
 import RecyclingCenterManagement from '../screens/dashboard/worker/RecyclingCenterManagement';
+import ReportManagement from '../screens/dashboard/worker/ReportManagement';
 
 const Stack = createNativeStackNavigator();
 
@@ -177,6 +178,14 @@ const WorkerStack = () => (
       component={RecyclingCenterManagement}
       options={{ 
         title: 'Gestion des Centres',
+        headerShown: true
+      }}
+    />
+    <Stack.Screen 
+      name="ReportManagement" 
+      component={ReportManagement}
+      options={{ 
+        title: 'Gestion des Signalements',
         headerShown: true
       }}
     />

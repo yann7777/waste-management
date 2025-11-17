@@ -221,6 +221,10 @@ exports.updateReportStatus = async (req, res) => {
         const { id } = req.params;
         const { status, resolutionNotes } = req.body;
 
+        console.log('📝 Mise à jour statut - ID:', id);
+        console.log('📝 Nouveau statut:', status);
+        console.log('📝 Notes:', resolutionNotes);
+
         const report = await Report.findByPk(id);
         if (!report) {
             return res.status(404).json({
@@ -229,21 +233,43 @@ exports.updateReportStatus = async (req, res) => {
             });
         }
 
+        // Validation du statut
+        const validStatuses = ['pending', 'in_progress', 'resolved', 'cancelled'];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({
+                success: false,
+                message: "Statut invalide. Valeurs acceptées: pending, in_progress, resolved, cancelled"
+            });
+        }
+
         await report.update({
             status,
-            resolutionNotes: resolutionNotes || report.resolutionNotes
+            resolutionNotes: resolutionNotes || report.resolutionNotes,
+            // Ajouter la date de résolution si le statut est résolu
+            ...(status === 'resolved' && { resolvedAt: new Date() }),
+            // Ajouter la date de prise en charge si le statut est in_progress
+            ...(status === 'in_progress' && { inProgressAt: new Date() })
         });
+
+        console.log('✅ Statut mis à jour avec succès');
 
         res.json({
             success: true,
             message: "Statut du signalement mis à jour",
-            data: { report }
+            data: { 
+                report: {
+                    id: report.id,
+                    status: report.status,
+                    resolutionNotes: report.resolutionNotes
+                }
+            }
         });
     } catch (error) {
+        console.error('❌ Erreur updateReportStatus:', error);
         res.status(500).json({
             success: false,
             message: "Erreur lors de la mise à jour du signalement",
-            error: error.message
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
 };
