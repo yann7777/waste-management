@@ -1,16 +1,66 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Alert
+  Alert,
+  ActivityIndicator
 } from 'react-native';
 import { useAuth } from '../../../contexts/AuthContext';
+import { reportService } from '../../../services/reportService';
+import { collectionScheduleService } from '../../../services/collectionScheduleService';
 
 const WorkerDashboard = ({ navigation }) => {
   const { user, logout } = useAuth();
+  const [pendingReportsCount, setPendingReportsCount] = useState(0);
+  const [scheduledCollectionsCount, setScheduledCollectionsCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  // Récupérer les données des signalements et collectes
+  const fetchWorkerData = async () => {
+    try {
+      setLoading(true);
+      
+      // Récupérer les signalements en attente
+      const reportsResponse = await reportService.getReports({ 
+        status: 'pending',
+        limit: 100
+      });
+      
+      if (reportsResponse.success) {
+        setPendingReportsCount(reportsResponse.data.reports.length);
+      }
+
+      // Récupérer les collectes programmées pour aujourd'hui
+      const today = new Date();
+      const todayStart = new Date(today.setHours(0, 0, 0, 0));
+      const todayEnd = new Date(today.setHours(23, 59, 59, 999));
+
+      const collectionsResponse = await collectionScheduleService.getUpcomingCollections(1);
+      
+      if (collectionsResponse.success) {
+        // Filtrer les collectes pour aujourd'hui seulement
+        const todayCollections = collectionsResponse.data.upcomingCollections.filter(schedule => {
+          const collectionDate = new Date(schedule.nextCollection);
+          return collectionDate >= todayStart && collectionDate <= todayEnd;
+        });
+        
+        setScheduledCollectionsCount(todayCollections.length);
+      }
+
+    } catch (error) {
+      console.error('Erreur lors du chargement des données worker:', error);
+      Alert.alert('Erreur', 'Impossible de charger les données');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchWorkerData();
+  }, []);
 
   const handleLogout = async () => {
     Alert.alert(
@@ -28,6 +78,16 @@ const WorkerDashboard = ({ navigation }) => {
       ]
     );
   };
+
+  // Afficher un indicateur de chargement
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3498db" />
+        <Text style={styles.loadingText}>Chargement des données...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -53,7 +113,7 @@ const WorkerDashboard = ({ navigation }) => {
           >
             <View style={styles.taskHeader}>
               <Text style={styles.taskIcon}>📋</Text>
-              <Text style={styles.taskBadge}>12</Text>
+              <Text style={styles.taskBadge}>{pendingReportsCount}</Text>
             </View>
             <Text style={styles.taskTitle}>Signalements en attente</Text>
             <Text style={styles.taskDescription}>À traiter aujourd'hui</Text>
@@ -65,7 +125,7 @@ const WorkerDashboard = ({ navigation }) => {
           >
             <View style={styles.taskHeader}>
               <Text style={styles.taskIcon}>🚚</Text>
-              <Text style={styles.taskBadge}>8</Text>
+              <Text style={styles.taskBadge}>{scheduledCollectionsCount}</Text>
             </View>
             <Text style={styles.taskTitle}>Collectes programmées</Text>
             <Text style={styles.taskDescription}>Itinéraire optimisé</Text>
@@ -110,6 +170,26 @@ const WorkerDashboard = ({ navigation }) => {
             <Text style={styles.actionIcon}>📊</Text>
             <Text style={styles.actionTitle}>Statistiques</Text>
             <Text style={styles.actionDescription}>Performance</Text>
+          </TouchableOpacity>
+
+          {/* Nouvelle carte Chat */}
+          <TouchableOpacity 
+            style={styles.actionCard}
+            onPress={() => navigation.navigate('WorkerChat')}
+          >
+            <Text style={styles.actionIcon}>💬</Text>
+            <Text style={styles.actionTitle}>Chat</Text>
+            <Text style={styles.actionDescription}>Communication</Text>
+          </TouchableOpacity>
+
+          {/* Nouvelle carte Notifications */}
+          <TouchableOpacity 
+            style={styles.actionCard}
+            onPress={() => navigation.navigate('WorkerNotifications')}
+          >
+            <Text style={styles.actionIcon}>🔔</Text>
+            <Text style={styles.actionTitle}>Notifications</Text>
+            <Text style={styles.actionDescription}>Alertes</Text>
           </TouchableOpacity>
         </View>
 
@@ -262,6 +342,18 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  // Styles pour l'indicateur de chargement
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#7f8c8d',
   },
 });
 

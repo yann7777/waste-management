@@ -13,7 +13,6 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { reportService } from '../../../services/reportService';
 import { ecoActionService } from '../../../services/ecoActionService';
 
-
 const CitizenDashboard = ({ navigation }) => {
   const { user, logout } = useAuth();
   const [stats, setStats] = useState({
@@ -201,7 +200,16 @@ const CitizenDashboard = ({ navigation }) => {
 
           <TouchableOpacity 
             style={styles.actionCard}
-            onPress={() => navigation.navigate('Events')}  // Changement ici
+            onPress={() => navigation.navigate('EcoActions')}
+          >
+            <Text style={styles.actionIcon}>🌱</Text>
+            <Text style={styles.actionTitle}>Actions Éco</Text>
+            <Text style={styles.actionDescription}>Gagner des points</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.actionCard}
+            onPress={() => navigation.navigate('Events')}
           >
             <Text style={styles.actionIcon}>🧹</Text>
             <Text style={styles.actionTitle}>Événements</Text>
@@ -210,11 +218,31 @@ const CitizenDashboard = ({ navigation }) => {
 
           <TouchableOpacity 
             style={styles.actionCard}
-            onPress={() => navigation.navigate('RecyclingCenters')}  // Nouvelle route à créer
+            onPress={() => navigation.navigate('RecyclingCenters')}
           >
             <Text style={styles.actionIcon}>♻️</Text>
             <Text style={styles.actionTitle}>Recyclage</Text>
             <Text style={styles.actionDescription}>Centres proches</Text>
+          </TouchableOpacity>
+
+          {/* CARTE : Chat */}
+          <TouchableOpacity 
+            style={styles.actionCard}
+            onPress={() => navigation.navigate('Chat')}
+          >
+            <Text style={styles.actionIcon}>💬</Text>
+            <Text style={styles.actionTitle}>Chat</Text>
+            <Text style={styles.actionDescription}>Communauté</Text>
+          </TouchableOpacity>
+
+          {/* NOUVELLE CARTE : Notifications */}
+          <TouchableOpacity 
+            style={styles.actionCard}
+            onPress={() => navigation.navigate('Notifications')}
+          >
+            <Text style={styles.actionIcon}>🔔</Text>
+            <Text style={styles.actionTitle}>Notifications</Text>
+            <Text style={styles.actionDescription}>Alertes</Text>
           </TouchableOpacity>
         </View>
 

@@ -65,5 +65,24 @@ export const recyclingCenterService = {
         } catch (error) {
             throw error.response?.data || { message: 'Erreur lors de la récupération des favoris' };
         }
-    }
+    },
+
+     // Créer un nouveau centre
+    createCenter: async (centerData) => {
+        try {
+        const response = await api.post('/recycling-centers', centerData);
+        return response.data;
+        } catch (error) {
+        throw error;
+        }
+    },
+
+    /*getAllCenters: async () => {
+        try {
+            const response = await api.get("/recycling-centers/public");
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || { message: 'Erreur lors de la récupération des centres' };
+        }
+    }*/
 };

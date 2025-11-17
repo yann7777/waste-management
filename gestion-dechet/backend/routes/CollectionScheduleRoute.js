@@ -17,5 +17,6 @@ router.put('/:id', authenticate, authorize('admin', 'worker'), collectionSchedul
 router.delete('/:id', authenticate, authorize('admin'), collectionScheduleController.deleteSchedule);
 router.patch('/:id/calculate-next', authenticate, authorize('admin', 'worker'), collectionScheduleController.calculateNextCollection);
 router.get('/stats/overview', authenticate, authorize('admin', 'worker'), collectionScheduleController.getCollectionStats);
+router.get('/worker/schedules', authenticate, authorize('worker'), collectionScheduleController.getWorkerSchedules);
 
 module.exports = router;

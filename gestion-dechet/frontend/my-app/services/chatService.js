@@ -59,5 +59,26 @@ export const chatService = {
         } catch (error) {
             throw error.response?.data || { message: 'Erreur lors de la suppression du message' };
         }
+    },
+
+     // Fonction pour créer une nouvelle discussion
+  createChat: async (recipientId) => {
+    try {
+      const response = await api.post('/chat/create', { recipientId });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Erreur lors de la création de la discussion' };
     }
+  },
+
+  // Fonction pour récupérer les utilisateurs pour le chat admin
+  getChatUsers: async () => {
+    try {
+      const response = await api.get('/chat/users');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Erreur lors de la récupération des utilisateurs' };
+    }
+  },
+  
 };

@@ -21,6 +21,7 @@ const chatRoute = require('./routes/ChatMessageRoute')
 const collectionScheduleRoute = require('./routes/CollectionScheduleRoute');
 const ecoActionRoute = require('./routes/EcoActionRoute');
 const recyclingCenterRoute = require('./routes/RecyclingCenterRoute');
+const userRoute = require('./routes/userRoute');
 
 const app = express();
 
@@ -34,6 +35,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes publiques
 app.use('/api/auth', authRoute);
 app.use('/api/docs', docsRoute);
+app.use('/api/users', authenticate, userRoute);
 
 // Routes protégées
 app.use('/api/reports', authenticate, reportRoute);
@@ -46,6 +48,7 @@ app.use('/api/chat', chatRoute);
 app.use('/api/collection-schedules', collectionScheduleRoute);
 app.use('/api/eco-actions', ecoActionRoute);
 app.use('/api/recycling-centers', recyclingCenterRoute);
+
 
 // Gestion des erreurs 404 - CORRIGÉ (CHOISISSEZ UNE DES DEUX OPTIONS)
 

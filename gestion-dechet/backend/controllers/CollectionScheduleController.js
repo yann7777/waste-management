@@ -303,3 +303,32 @@ function calculateNextCollectionDate(schedule) {
 
     return nextDate;
 }
+
+// Dans CollectionScheduleController.js
+exports.getWorkerSchedules = async (req, res) => {
+    try {
+        const { zone } = req.query;
+        const whereClause = {};
+
+        // Si le worker a une zone assignée, filtrer par cette zone
+        if (zone) {
+            whereClause.zone = zone;
+        }
+
+        const schedules = await CollectionSchedule.findAll({
+            where: whereClause,
+            order: [['zone', 'ASC'], ['wasteType', 'ASC']]
+        });
+
+        res.json({
+            success: true,
+            data: { schedules }
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: "Erreur lors de la récupération des plannings worker",
+            error: error.message
+        });
+    }
+};

@@ -263,5 +263,18 @@ export const reportService = {
                 message: 'Erreur lors de la récupération des statistiques' 
             };
         }
-    }
+    },
+
+    getWorkerReports: async (params) => {
+        try {
+        const queryParams = new URLSearchParams();
+        if (params.workerId) queryParams.append('workerId', params.workerId);
+        if (params.timeRange) queryParams.append('timeRange', params.timeRange);
+        
+        const response = await api.get(`/reports/worker-stats?${queryParams}`);
+        return response.data;
+        } catch (error) {
+        throw error.response?.data || { message: 'Erreur lors de la récupération des rapports worker' };
+        }
+    },
 };

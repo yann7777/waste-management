@@ -31,5 +31,16 @@ export const ecoActionService = {
         } catch (error) {
             throw error.response?.data || { message: 'Erreur lors de la récupération des statistiques' };
         }
+    },
+
+    getUserStats: async (userId) => {
+        try {
+            response = await api.get("/eco-actions/stats", {
+            params: { userId }
+        });
+        return response.data;
+        } catch (error) {
+            throw error.response?.data || { message: 'Erreur lors de la récupération des statistiques utilisateur' };
+        }
     }
 };

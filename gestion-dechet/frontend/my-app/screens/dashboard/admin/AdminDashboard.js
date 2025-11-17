@@ -1,16 +1,45 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Alert
+  Alert,
+  ActivityIndicator,
+  RefreshControl 
 } from 'react-native';
 import { useAuth } from '../../../contexts/AuthContext';
+import { userService } from '../../../services/userService';
 
 const AdminDashboard = ({ navigation }) => {
   const { user, logout } = useAuth();
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    activeReports: 0,
+    upcomingEvents: 0,
+    totalWorkers: 0
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      const statsResponse = await userService.getStats();
+      if (statsResponse.success) {
+        setStats(statsResponse.data);
+      }
+    } catch (error) {
+      console.error('Erreur chargement données:', error);
+      Alert.alert('Erreur', 'Impossible de charger les données du dashboard');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogout = async () => {
     Alert.alert(
@@ -29,6 +58,15 @@ const AdminDashboard = ({ navigation }) => {
     );
   };
 
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color="#9b59b6" />
+        <Text style={styles.loadingText}>Chargement des données...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -42,25 +80,31 @@ const AdminDashboard = ({ navigation }) => {
         </View>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} refreshControl={
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={loadDashboardData}
+          colors={['#9b59b6']}
+        />
+      }>
         {/* Vue d'ensemble */}
         <Text style={styles.sectionTitle}>Vue d'Ensemble</Text>
         
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
-            <Text style={styles.statNumber}>1,254</Text>
+            <Text style={styles.statNumber}>{stats.totalUsers}</Text>
             <Text style={styles.statLabel}>Utilisateurs</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statNumber}>89</Text>
+            <Text style={styles.statNumber}>{stats.activeReports}</Text>
             <Text style={styles.statLabel}>Signalements</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statNumber}>15</Text>
+            <Text style={styles.statNumber}>{stats.upcomingEvents}</Text>
             <Text style={styles.statLabel}>Événements</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statNumber}>8</Text>
+            <Text style={styles.statNumber}>{stats.totalWorkers}</Text>
             <Text style={styles.statLabel}>Employés</Text>
           </View>
         </View>
@@ -102,7 +146,27 @@ const AdminDashboard = ({ navigation }) => {
           >
             <Text style={styles.adminIcon}>📈</Text>
             <Text style={styles.adminTitle}>Analytics</Text>
-            <Text style={styles.adminDescription}>Statistiques</Text>
+            <Text style={styles.adminDescription}>Statistiques détaillées</Text>
+          </TouchableOpacity>
+
+          {/* Nouvelle carte Planning de collecte */}
+          <TouchableOpacity 
+            style={styles.adminCard}
+            onPress={() => navigation.navigate('CollectionPlanning')}
+          >
+            <Text style={styles.adminIcon}>🗓️</Text>
+            <Text style={styles.adminTitle}>Planning</Text>
+            <Text style={styles.adminDescription}>Collectes</Text>
+          </TouchableOpacity>
+
+          {/* Nouvelle carte Chat */}
+          <TouchableOpacity 
+            style={styles.adminCard}
+            onPress={() => navigation.navigate('AdminChat')}
+          >
+            <Text style={styles.adminIcon}>💬</Text>
+            <Text style={styles.adminTitle}>Chat</Text>
+            <Text style={styles.adminDescription}>Messagerie</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
@@ -137,6 +201,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#7f8c8d',
   },
   header: {
     backgroundColor: '#9b59b6',

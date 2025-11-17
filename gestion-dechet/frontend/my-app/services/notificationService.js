@@ -49,5 +49,23 @@ export const notificationService = {
         } catch (error) {
             throw error.response?.data || { message: 'Erreur lors de la suppression de la notification' };
         }
+    },
+
+    broadcastNotification: async (notificationData) => {
+    try {
+        const response = await api.post('/notifications/broadcast', notificationData);
+        return response.data;
+    } catch (error) {
+        throw error.response?.data || { message: 'Erreur lors de l\'envoi de la notification globale' };
+    }
+    },
+
+    sendNotificationToRole: async (notificationData) => {
+    try {
+        const response = await api.post('/notifications/broadcast-to-role', notificationData);
+        return response.data;
+    } catch (error) {
+        throw error.response?.data || { message: 'Erreur lors de l\'envoi de la notification' };
+    }
     }
 };

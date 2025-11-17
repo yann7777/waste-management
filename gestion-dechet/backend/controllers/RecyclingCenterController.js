@@ -85,47 +85,19 @@ exports.getAllRecyclingCenters = async (req, res) => {
         let recyclingCenters;
         let count;
 
-        // Si des coordonnées utilisateur sont fournies, calculer la distance
-        if (userLat && userLng && maxDistance) {
-            const userLatNum = parseFloat(userLat);
-            const userLngNum = parseFloat(userLng);
-            const maxDistanceNum = parseFloat(maxDistance);
+        // MODIFICATION : Utiliser findAndCountAll avec attributes pour exclure createdBy
+        const result = await RecyclingCenter.findAndCountAll({
+            where: whereClause,
+            order,
+            limit: parseInt(limit),
+            offset: parseInt(offset),
+            attributes: {
+                exclude: ['createdBy'] // Exclure la colonne problématique
+            }
+        });
 
-            // Requête avec calcul de distance
-            const query = `
-                SELECT *,
-                (6371 * acos(cos(radians($1)) * cos(radians((location->>'lat')::float)) 
-                * cos(radians((location->>'lng')::float) - radians($2)) 
-                + sin(radians($1)) * sin(radians((location->>'lat')::float)))) 
-                AS distance
-                FROM "RecyclingCenters"
-                WHERE (6371 * acos(cos(radians($1)) * cos(radians((location->>'lat')::float)) 
-                * cos(radians((location->>'lng')::float) - radians($2)) 
-                + sin(radians($1)) * sin(radians((location->>'lat')::float)))) <= $3
-                ORDER BY distance ASC
-                LIMIT $4 OFFSET $5
-            `;
-
-            recyclingCenters = await sequelize.query(query, {
-                replacements: [userLatNum, userLngNum, maxDistanceNum, parseInt(limit), parseInt(offset)],
-                model: RecyclingCenter,
-                mapToModel: true
-            });
-
-            // Compter le total (approximatif pour la pagination)
-            count = recyclingCenters.length;
-        } else {
-            // Requête standard sans calcul de distance
-            const result = await RecyclingCenter.findAndCountAll({
-                where: whereClause,
-                order,
-                limit: parseInt(limit),
-                offset: parseInt(offset)
-            });
-
-            recyclingCenters = result.rows;
-            count = result.count;
-        }
+        recyclingCenters = result.rows;
+        count = result.count;
 
         res.json({
             success: true,
@@ -139,6 +111,7 @@ exports.getAllRecyclingCenters = async (req, res) => {
             }
         });
     } catch (error) {
+        console.error('Erreur détaillée:', error);
         res.status(500).json({
             success: false,
             message: "Erreur lors de la récupération des centres de recyclage",
